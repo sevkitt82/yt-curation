@@ -60,20 +60,29 @@ async function hnPosts(keyword: string) {
   return posts;
 }
 
-async function gather(config: SourceConfig): Promise<FoundLink[]> {
+async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; warnings: string[] }> {
   const links: FoundLink[] = [];
+  const warnings: string[] = [];
   for (const [index, subreddit] of config.subreddits.entries()) {
     if (index > 0) await pause(2000);
-    const posts = await redditPosts(subreddit);
-    links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
+    try {
+      const posts = await redditPosts(subreddit);
+      links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
+    } catch (error) {
+      warnings.push(error instanceof Error ? error.message : `Reddit r/${subreddit} failed.`);
+    }
   }
   if (config.hn) {
     for (const keyword of config.keywords) {
-      const posts = await hnPosts(keyword);
-      links.push(...linksInPosts(posts, "hacker_news", "hn:"));
+      try {
+        const posts = await hnPosts(keyword);
+        links.push(...linksInPosts(posts, "hacker_news", "hn:"));
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : "Hacker News search failed.");
+      }
     }
   }
-  return links;
+  return { links, warnings };
 }
 
 export async function collectTopic(
@@ -81,13 +90,10 @@ export async function collectTopic(
   topic: { id: string; slug: string; source_config?: unknown },
 ): Promise<{ added: number; sources: number; error?: string }> {
   const config = sourceConfigFor(topic.slug, topic.source_config);
-  let links: FoundLink[];
-  try {
-    links = await gather(config);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Collection failed.";
-    console.error("collect failed", topic.slug, message);
-    return { added: 0, sources: 0, error: message };
+  const gathered = await gather(config);
+  const links = gathered.links;
+  if (gathered.warnings.length > 0) {
+    console.error("collect warnings", topic.slug, gathered.warnings.join(" "));
   }
 
   const unique = new Map<string, FoundLink>();
