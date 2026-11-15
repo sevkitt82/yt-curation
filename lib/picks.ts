@@ -1,5 +1,6 @@
 import "server-only";
 
+import { connection } from "next/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { laToday, youtubeDataIsFresh } from "@/lib/time";
 import type { LengthBucket, Level, PublicPick, SourceRow, Topic, VideoRow } from "@/lib/types";
@@ -29,6 +30,7 @@ export function videoIsPublic(video: VideoRow): boolean {
 }
 
 export async function listLiveTopics(): Promise<Topic[]> {
+  await connection();
   const db = createPublicClient();
   if (!db) return [];
   const { data, error } = await db
@@ -44,6 +46,7 @@ export async function listLiveTopics(): Promise<Topic[]> {
 }
 
 export async function getTopicBySlug(slug: string): Promise<Topic | null> {
+  await connection();
   const db = createPublicClient();
   if (!db) return null;
   const { data } = await db
@@ -55,6 +58,7 @@ export async function getTopicBySlug(slug: string): Promise<Topic | null> {
 }
 
 export async function listPublicPicks(topicId: string): Promise<PublicPick[]> {
+  await connection();
   const db = createPublicClient();
   if (!db) return [];
   const today = laToday();

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { runDaily } from "@/lib/daily";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -6,6 +7,7 @@ import { laToday } from "@/lib/time";
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
+  await connection();
   if (!cronAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
