@@ -21,6 +21,27 @@ type SourceJoin = {
   comment_count?: number | null;
 };
 
+async function sourcesFor(
+  admin: SupabaseClient,
+  topicId: string,
+  videoIds: string[],
+): Promise<Map<string, SourceJoin[]>> {
+  const grouped = new Map<string, SourceJoin[]>();
+  if (videoIds.length === 0) return grouped;
+  const result = await admin
+    .from("recommendation_sources")
+    .select("video_id, platform, source_url, quote_or_summary, source_key, source_score, comment_count")
+    .eq("topic_id", topicId)
+    .in("video_id", videoIds);
+  if (result.error) throw new Error(result.error.message);
+  for (const row of (result.data ?? []) as (SourceJoin & { video_id: string })[]) {
+    const list = grouped.get(row.video_id) ?? [];
+    list.push(row);
+    grouped.set(row.video_id, list);
+  }
+  return grouped;
+}
+
 async function recordGap(admin: SupabaseClient, topicId: string, reason: string) {
   console.error("pick gap", topicId, reason);
   await admin.from("analytics_events").insert({
@@ -33,7 +54,7 @@ async function recordGap(admin: SupabaseClient, topicId: string, reason: string)
 export async function pickTopic(
   admin: SupabaseClient,
   topic: { id: string; slug: string },
-): Promise<{ pickDate?: string; gap?: string; skipped?: string }> {
+): Promise<{ pickDate?: string; youtubeId?: string; whyLine?: string; gap?: string; skipped?: string }> {
   const earliest = earliestPickDate();
   const { data: scheduled, error: scheduledError } = await admin
     .from("topic_videos")
@@ -48,27 +69,56 @@ export async function pickTopic(
   }
   if ((scheduled ?? []).length > 0) return { skipped: `${earliest} already has a pick.` };
 
-  const { data: pool, error: poolError } = await admin
+  const poolResult = await admin
     .from("topic_videos")
     .select(
       `id, video_id,
-       videos!inner (id, channel_id, is_unavailable, embeddable, privacy_status),
-       recommendation_sources (platform, source_url, quote_or_summary, source_key, source_score, comment_count)`,
+       videos!inner (id, youtube_video_id, channel_id, is_unavailable, embeddable, privacy_status)`,
     )
     .eq("topic_id", topic.id)
     .eq("status", "candidate")
     .is("pick_date", null);
+  const poolError = poolResult.error;
+  const pool = (poolResult.data ?? []) as Array<{
+    id: string;
+    video_id: string;
+    videos: {
+      id: string;
+      youtube_video_id: string;
+      channel_id: string | null;
+      is_unavailable: boolean;
+      embeddable: boolean | null;
+      privacy_status: string | null;
+    } | Array<{
+      id: string;
+      youtube_video_id: string;
+      channel_id: string | null;
+      is_unavailable: boolean;
+      embeddable: boolean | null;
+      privacy_status: string | null;
+    }>;
+  }>;
   if (poolError) {
     await recordGap(admin, topic.id, poolError.message);
     return { gap: poolError.message };
   }
+  let poolSources: Map<string, SourceJoin[]>;
+  try {
+    poolSources = await sourcesFor(admin, topic.id, pool.map((row) => row.video_id));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not read recommendation sources.";
+    await recordGap(admin, topic.id, message);
+    return { gap: message };
+  }
 
   const channelOn = channelWeightingEnabled();
+  const youtubeById = new Map<string, string>();
   const candidates: CandidateInput[] = [];
-  for (const row of pool ?? []) {
+  for (const row of pool) {
     const video = Array.isArray(row.videos) ? row.videos[0] : row.videos;
     if (!video || video.is_unavailable || video.embeddable === false || video.privacy_status !== "public") continue;
-    const sources = ((row.recommendation_sources ?? []) as SourceJoin[]).flatMap((source) => {
+    youtubeById.set(row.id as string, video.youtube_video_id as string);
+    const sources = (poolSources.get(row.video_id) ?? []).flatMap((source) => {
       const key = sourceKeyFor(source.platform, source.source_url, source.source_key);
       if (!key) return [];
       return [
@@ -90,20 +140,26 @@ export async function pickTopic(
     });
   }
 
-  const { data: past } = await admin
+  const pastResult = await admin
     .from("topic_videos")
-    .select(
-      `id, pick_date, video_id,
-       videos (channel_id),
-       recommendation_sources (platform, source_url, source_key)`,
-    )
+    .select(`id, pick_date, video_id, videos (channel_id)`)
     .eq("topic_id", topic.id)
     .eq("status", "approved")
     .not("pick_date", "is", null)
     .order("pick_date", { ascending: false })
     .limit(40);
+  const past = (pastResult.data ?? []) as Array<{
+    id: string;
+    video_id: string;
+    videos: { channel_id: string | null } | Array<{ channel_id: string | null }> | null;
+  }>;
+  const pastSources = await sourcesFor(
+    admin,
+    topic.id,
+    past.map((row) => row.video_id),
+  ).catch(() => new Map<string, SourceJoin[]>());
 
-  const pastIds = (past ?? []).map((row) => row.video_id as string);
+  const pastIds = past.map((row) => row.video_id);
   const { data: votes } = pastIds.length
     ? await admin
         .from("feedback")
@@ -121,8 +177,8 @@ export async function pickTopic(
     votesByVideo.set(vote.video_id as string, current);
   }
 
-  const rateRows = (past ?? []).map((row) => {
-    const keys = ((row.recommendation_sources ?? []) as SourceJoin[]).flatMap((source) => {
+  const rateRows = past.map((row) => {
+    const keys = (pastSources.get(row.video_id) ?? []).flatMap((source) => {
       const key = sourceKeyFor(source.platform, source.source_url, source.source_key);
       return key ? [key] : [];
     });
@@ -134,7 +190,7 @@ export async function pickTopic(
 
   let channelRates: Map<string, RateStat> | null = null;
   if (channelOn) {
-    const byChannel = (past ?? []).map((row) => {
+    const byChannel = past.map((row) => {
       const video = Array.isArray(row.videos) ? row.videos[0] : row.videos;
       const channelId = (video?.channel_id as string | null) ?? "";
       const vote = votesByVideo.get(row.video_id as string) ?? { good: 0, total: 0 };
@@ -155,21 +211,36 @@ export async function pickTopic(
     return { gap: chosen.gap };
   }
 
-  const { error } = await admin
-    .from("topic_videos")
-    .update({
-      status: "approved",
-      pick_date: earliest,
-      why_line: chosen.choice.whyLine,
-      pick_rationale: chosen.choice.rationale,
-      picked_by: "ai",
-      approved_at: new Date().toISOString(),
-    })
-    .eq("id", chosen.choice.videoId)
-    .eq("topic_id", topic.id);
+  const payload = {
+    status: "approved",
+    pick_date: earliest,
+    why_line: chosen.choice.whyLine,
+    pick_rationale: chosen.choice.rationale,
+    picked_by: "ai",
+    approved_at: new Date().toISOString(),
+  };
+  let { error } = await admin.from("topic_videos").update(payload).eq("id", chosen.choice.videoId).eq("topic_id", topic.id);
+  if (error?.message.includes("picked_by") || error?.message.includes("pick_rationale")) {
+    console.error("0004_ai_pick.sql is not applied; saving the pick without picked_by.");
+    const retry = await admin
+      .from("topic_videos")
+      .update({
+        status: "approved",
+        pick_date: earliest,
+        why_line: chosen.choice.whyLine,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", chosen.choice.videoId)
+      .eq("topic_id", topic.id);
+    error = retry.error;
+  }
   if (error) {
     await recordGap(admin, topic.id, error.message);
     return { gap: error.message };
   }
-  return { pickDate: earliest };
+  return {
+    pickDate: earliest,
+    youtubeId: youtubeById.get(chosen.choice.videoId),
+    whyLine: chosen.choice.whyLine,
+  };
 }

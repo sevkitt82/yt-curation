@@ -9,36 +9,41 @@ import { fetchVideosList, metadataRow } from "@/lib/youtube";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let redditJsonBlocked = false;
+
 async function redditPosts(subreddit: string) {
   const headers = { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml" };
-  const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
-  if (jsonResponse.ok) {
-    const body = (await jsonResponse.json()) as {
-      data?: { children?: { data?: Record<string, unknown> }[] };
-    };
-    return (body.data?.children ?? []).flatMap((child) => {
-      const data = child.data ?? {};
-      const permalink = typeof data.permalink === "string" ? `https://www.reddit.com${data.permalink}` : "";
-      const text = [data.title, data.selftext, data.url].filter((item) => typeof item === "string").join(" ");
-      if (!permalink) return [];
-      return [
-        {
-          sourceUrl: permalink,
-          text,
-          excerpt: String(data.title ?? text).slice(0, 400),
-          sourceScore: typeof data.score === "number" ? data.score : null,
-          commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
-          recommendedAt:
-            typeof data.created_utc === "number"
-              ? new Date(data.created_utc * 1000).toISOString().slice(0, 10)
-              : null,
-        },
-      ];
-    });
+  if (!redditJsonBlocked) {
+    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
+    if (jsonResponse.status === 403) redditJsonBlocked = true;
+    if (jsonResponse.ok) {
+      const body = (await jsonResponse.json()) as {
+        data?: { children?: { data?: Record<string, unknown> }[] };
+      };
+      return (body.data?.children ?? []).flatMap((child) => {
+        const data = child.data ?? {};
+        const permalink = typeof data.permalink === "string" ? `https://www.reddit.com${data.permalink}` : "";
+        const text = [data.title, data.selftext, data.url].filter((item) => typeof item === "string").join(" ");
+        if (!permalink) return [];
+        return [
+          {
+            sourceUrl: permalink,
+            text,
+            excerpt: String(data.title ?? text).slice(0, 400),
+            sourceScore: typeof data.score === "number" ? data.score : null,
+            commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
+            recommendedAt:
+              typeof data.created_utc === "number"
+                ? new Date(data.created_utc * 1000).toISOString().slice(0, 10)
+                : null,
+          },
+        ];
+      });
+    }
   }
   let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
   if (rssResponse.status === 429) {
-    await pause(2000);
+    await pause(8000);
     rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
   }
   if (!rssResponse.ok) throw new Error(`Reddit r/${subreddit} returned ${rssResponse.status}.`);
@@ -60,20 +65,29 @@ async function hnPosts(keyword: string) {
   return posts;
 }
 
-async function gather(config: SourceConfig): Promise<FoundLink[]> {
+async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; warnings: string[] }> {
   const links: FoundLink[] = [];
+  const warnings: string[] = [];
   for (const [index, subreddit] of config.subreddits.entries()) {
-    if (index > 0) await pause(2000);
-    const posts = await redditPosts(subreddit);
-    links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
+    if (index > 0) await pause(5000);
+    try {
+      const posts = await redditPosts(subreddit);
+      links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
+    } catch (error) {
+      warnings.push(error instanceof Error ? error.message : `Reddit r/${subreddit} failed.`);
+    }
   }
   if (config.hn) {
     for (const keyword of config.keywords) {
-      const posts = await hnPosts(keyword);
-      links.push(...linksInPosts(posts, "hacker_news", "hn:"));
+      try {
+        const posts = await hnPosts(keyword);
+        links.push(...linksInPosts(posts, "hacker_news", "hn:"));
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : "Hacker News search failed.");
+      }
     }
   }
-  return links;
+  return { links, warnings };
 }
 
 export async function collectTopic(
@@ -81,13 +95,10 @@ export async function collectTopic(
   topic: { id: string; slug: string; source_config?: unknown },
 ): Promise<{ added: number; sources: number; error?: string }> {
   const config = sourceConfigFor(topic.slug, topic.source_config);
-  let links: FoundLink[];
-  try {
-    links = await gather(config);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Collection failed.";
-    console.error("collect failed", topic.slug, message);
-    return { added: 0, sources: 0, error: message };
+  const gathered = await gather(config);
+  const links = gathered.links;
+  if (gathered.warnings.length > 0) {
+    console.error("collect warnings", topic.slug, gathered.warnings.join(" "));
   }
 
   const unique = new Map<string, FoundLink>();
@@ -176,7 +187,21 @@ export async function collectTopic(
       source_score: link.sourceScore,
       comment_count: link.commentCount,
     });
+    if (error?.message.includes("source_key") || error?.message.includes("source_score") || error?.message.includes("comment_count")) {
+      const retry = await admin.from("recommendation_sources").insert({
+        topic_id: topic.id,
+        video_id: video.id,
+        platform: link.platform,
+        source_url: link.sourceUrl,
+        quote_or_summary: link.excerpt,
+        recommended_at: link.recommendedAt,
+      });
+      if (!retry.error) sources += 1;
+      else console.error("source insert failed", retry.error.message);
+      continue;
+    }
     if (!error) sources += 1;
+    else console.error("source insert failed", error.message);
   }
 
   return { added, sources };
