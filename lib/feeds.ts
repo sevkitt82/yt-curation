@@ -15,24 +15,56 @@ export type FoundLink = RawPost & {
   platform: "reddit" | "hacker_news";
 };
 
-function decode(value: string): string {
+function decodeEntities(value: string): string {
   return value
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, " ")
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(Number(num)))
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
+    .replace(/&apos;|&#39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
+/** Plain text: decode entities first so escaped tags can be removed. */
+export function plainText(value: string): string {
+  let text = value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  for (let i = 0; i < 3; i++) {
+    const decoded = decodeEntities(text);
+    if (decoded === text) break;
+    text = decoded;
+  }
+  text = text.replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ");
+  text = decodeEntities(text);
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function withoutBoilerplate(value: string): string {
+  return value
+    .replace(/\bsubmitted by\b[\s\S]*$/i, "")
+    .replace(/\[(link|comments)\]/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function excerptFrom(text: string): string {
-  const withoutUrls = text.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
-  return (withoutUrls || text).slice(0, 400);
+/** Title, then a short body, together at most 200 characters. */
+export function postSummary(title: string, body: string): string {
+  const cleanTitle = withoutBoilerplate(plainText(title)).slice(0, 200);
+  let rest = withoutBoilerplate(plainText(body));
+  if (cleanTitle && rest.toLowerCase().startsWith(cleanTitle.toLowerCase())) {
+    rest = rest.slice(cleanTitle.length).trim();
+  }
+  const room = 200 - cleanTitle.length - 1;
+  const excerpt = room > 0 ? rest.slice(0, room).trim() : "";
+  if (!cleanTitle) return excerpt.slice(0, 200);
+  return excerpt ? `${cleanTitle}\n${excerpt}` : cleanTitle;
+}
+
+/** Repair a quote already saved from an older Reddit feed parse. */
+export function cleanStoredQuote(raw: string): string {
+  const title = plainText(raw.split(/<|<!--|\bsubmitted by\b/i)[0] ?? "");
+  return postSummary(title, raw);
 }
 
 function dateOnly(value: string | null): string | null {
@@ -47,15 +79,17 @@ export function parseRedditRss(xml: string): RawPost[] {
   for (const chunk of xml.split("<entry>").slice(1)) {
     const entry = chunk.split("</entry>")[0] ?? "";
     const link = entry.match(/<link[^>]*href="([^"]+)"/)?.[1] ?? "";
-    const title = decode(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "");
-    const content = decode(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? "");
+    const rawTitle = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "";
+    const rawContent = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? "";
+    const hrefs = [...entry.matchAll(/href="([^"]+)"/g)].map((match) => decodeEntities(match[1]));
     const published = entry.match(/<published>([^<]+)<\/published>/)?.[1] ?? null;
-    const text = `${title} ${content}`.trim();
+    const title = plainText(rawTitle);
+    const text = `${title} ${plainText(rawContent)} ${hrefs.join(" ")}`.trim();
     if (!link) continue;
     posts.push({
-      sourceUrl: decode(link),
+      sourceUrl: decodeEntities(link),
       text,
-      excerpt: excerptFrom(text),
+      excerpt: postSummary(rawTitle, rawContent),
       sourceScore: null,
       commentCount: null,
       recommendedAt: dateOnly(published),
@@ -86,7 +120,7 @@ export function parseHnHits(hits: HnHit[]): RawPost[] {
       {
         sourceUrl: `https://news.ycombinator.com/item?id=${hit.objectID}`,
         text,
-        excerpt: excerptFrom(hit.comment_text || hit.story_text || hit.title || hit.story_title || text),
+        excerpt: postSummary(hit.title || hit.story_title || "", hit.comment_text || hit.story_text || ""),
         sourceScore: typeof hit.points === "number" ? hit.points : null,
         commentCount: typeof hit.num_comments === "number" ? hit.num_comments : null,
         recommendedAt: dateOnly(hit.created_at ?? null),

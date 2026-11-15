@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it, mock } from "node:test";
-import { parseRedditRss, linksInPosts } from "../lib/feeds";
+import { cleanStoredQuote, linksInPosts, parseRedditRss } from "../lib/feeds";
 import {
   MISSING_KEY_MESSAGE,
   chooseFromPool,
@@ -163,5 +163,21 @@ describe("dates and sources", () => {
     assert.equal(links.length, 1);
     assert.equal(links[0]?.youtubeId, "dQw4w9WgXcQ");
     assert.equal(links[0]?.sourceKey, "reddit:r/Starfield");
+  });
+
+  it("stores a reddit post as a title and a short plain excerpt", () => {
+    const xml = `<feed><entry><link href="https://www.reddit.com/r/starfieldmods/comments/abc/starfield_manual_leaning/" /><title>Starfield Manual Leaning</title><content>&lt;table&gt;&lt;!-- SC_OFF --&gt;&lt;p&gt;Working in first and third person.&lt;/p&gt;&amp;#32; submitted by &amp;#32; &lt;a href="https://www.reddit.com/user/x"&gt;/u/x&lt;/a&gt; https://youtu.be/abcdefghijk</content></entry></feed>`;
+    const [post] = parseRedditRss(xml);
+    assert.equal(post?.excerpt.startsWith("Starfield Manual Leaning\n"), true);
+    assert.equal(post?.excerpt.includes("<"), false);
+    assert.equal(post?.excerpt.includes("submitted by"), false);
+    assert.ok((post?.excerpt.length ?? 0) <= 200);
+    assert.equal(post?.text.includes("abcdefghijk"), true);
+    const cleaned = cleanStoredQuote(
+      `Starfield Manual Leaning <table> <tr><td> <!-- SC_OFF --><p>Working in first and third person.</p> &#32; submitted by &#32; <a href="/u/x">/u/x</a>`,
+    );
+    assert.equal(cleaned.includes("<"), false);
+    assert.equal(cleaned.includes("submitted by"), false);
+    assert.ok(cleaned.length <= 200);
   });
 });

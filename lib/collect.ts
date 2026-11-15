@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COLLECTOR_USER_AGENT } from "@/lib/config";
-import { linksInPosts, parseHnHits, parseRedditRss, type FoundLink } from "@/lib/feeds";
+import { linksInPosts, parseHnHits, parseRedditRss, postSummary, type FoundLink } from "@/lib/feeds";
 import { sourceConfigFor } from "@/lib/source-config";
 import type { SourceConfig } from "@/lib/types";
 import { fetchVideosList, metadataRow } from "@/lib/youtube";
@@ -29,7 +29,7 @@ async function redditPosts(subreddit: string) {
           {
             sourceUrl: permalink,
             text,
-            excerpt: String(data.title ?? text).slice(0, 400),
+            excerpt: postSummary(String(data.title ?? ""), String(data.selftext ?? "")),
             sourceScore: typeof data.score === "number" ? data.score : null,
             commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
             recommendedAt:

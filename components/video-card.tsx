@@ -40,14 +40,25 @@ export function VideoCard({ pick, topicId, topicSlug }: { pick: PublicPick; topi
   );
 }
 
+function sourceLabel(source: PublicPick["sources"][number]): string {
+  const subreddit = source.source_url?.match(/reddit\.com\/r\/([^/?#]+)/i)?.[1];
+  const title = source.quote_or_summary?.split("\n")[0]?.trim() ?? "";
+  if (subreddit) return title ? `r/${subreddit}: ${title}` : `r/${subreddit}`;
+  if (source.source_url?.includes("news.ycombinator.com")) return title ? `Hacker News: ${title}` : "Hacker News";
+  return title || source.platform;
+}
+
 export function SourceList({ sources }: { sources: PublicPick["sources"] }) {
   if (sources.length === 0) return null;
   return (
     <ul className="list-disc pl-5 text-sm">
       {sources.map((source) => (
         <li key={source.id}>
-          {source.source_url ? <a href={source.source_url}>{source.platform}</a> : source.platform}
-          {source.quote_or_summary ? ` — ${source.quote_or_summary}` : ""}
+          {source.source_url ? (
+            <a href={source.source_url}>{sourceLabel(source)}</a>
+          ) : (
+            sourceLabel(source)
+          )}
         </li>
       ))}
     </ul>
