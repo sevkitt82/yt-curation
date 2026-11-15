@@ -14,7 +14,7 @@ let redditJsonBlocked = false;
 async function redditPosts(subreddit: string) {
   const headers = { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml" };
   if (!redditJsonBlocked) {
-    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
+    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=100`, { headers });
     if (jsonResponse.status === 403) redditJsonBlocked = true;
     if (jsonResponse.ok) {
       const body = (await jsonResponse.json()) as {
@@ -41,10 +41,10 @@ async function redditPosts(subreddit: string) {
       });
     }
   }
-  let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
+  let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
   if (rssResponse.status === 429) {
     await pause(8000);
-    rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
+    rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
   }
   if (!rssResponse.ok) throw new Error(`Reddit r/${subreddit} returned ${rssResponse.status}.`);
   return parseRedditRss(await rssResponse.text());
