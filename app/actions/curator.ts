@@ -40,6 +40,23 @@ async function topicContext(slug: string) {
   return { curator, supabase, topic };
 }
 
+export async function saveChannels(formData: FormData) {
+  const slug = String(formData.get("slug") ?? "");
+  const { topic } = await topicContext(slug);
+  const admin = createAdminClient();
+  if (!admin) notice(slug, "SUPABASE_SECRET_KEY is not set.");
+  const channels = String(formData.get("channels") ?? "")
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const { data: current } = await admin.from("topics").select("source_config").eq("id", topic.id).maybeSingle();
+  const sourceConfig = { ...((current?.source_config as Record<string, unknown> | null) ?? {}), channels };
+  const { error } = await admin.from("topics").update({ source_config: sourceConfig }).eq("id", topic.id);
+  if (error) notice(slug, error.message);
+  revalidatePath(`/curator/topics/${slug}`);
+  notice(slug, channels.length ? `Saved ${channels.length} channels.` : "Channel list cleared.");
+}
+
 function sourceFromForm(formData: FormData, suffix: string) {
   const platform = String(formData.get(`platform${suffix}`) ?? "");
   const sourceUrl = String(formData.get(`source_url${suffix}`) ?? "").trim();

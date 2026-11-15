@@ -100,6 +100,7 @@ export function buildPickPrompt(
     `Choose ${count} different video ids from the list. You are given only recommendation posts from outside YouTube, plus an opaque id.`,
     "Do not use or invent YouTube titles, descriptions, thumbnails, comments, view counts, or like counts. They are not inputs.",
     "Prefer sources with a higher good-rate. Still explore: when a source has little vote data, it can be the right pick.",
+    "A post score of 3 is an independent share. A post score of 1 is the channel's own upload or the owner posting it. Prefer independent shares.",
     "Write a why-line of one or two sentences that cites the recommendation. Write a short rationale for the curator.",
     "",
     ...lines,

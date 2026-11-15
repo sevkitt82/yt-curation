@@ -90,7 +90,7 @@ export async function listPublicPicks(topicId: string): Promise<PublicPick[]> {
   if (videoIds.length > 0) {
     const { data: sourceRows } = await db
       .from("recommendation_sources")
-      .select("id, video_id, platform, source_url, quote_or_summary, recommended_at")
+      .select("id, video_id, platform, source_url, quote_or_summary, recommended_at, source_key")
       .eq("topic_id", topicId)
       .in("video_id", videoIds);
     for (const source of (sourceRows ?? []) as (SourceRow & { video_id: string })[]) {

@@ -7,9 +7,8 @@ export default function HowWePickPage() {
     <article className="max-w-2xl flex flex-col gap-4">
       <h1 className="text-4xl">How we pick</h1>
       <p>
-        Each topic gets one video a day. The pool is YouTube links people shared on a few outside sites: subreddit
-        feeds, and Hacker News when that topic has it turned on. A video is not chosen from YouTube&apos;s browse
-        pages.
+        Each topic gets three videos a day. The pool is videos from trusted YouTube channels, plus links people share on
+        Mastodon, Lemmy, and Hacker News. A share from someone other than the channel owner counts for more.
       </p>
       <p>
         The why-line cites that recommendation. It is not a YouTube statistic. View counts and like counts are not

@@ -7,12 +7,13 @@ export type RawPost = {
   sourceScore: number | null;
   commentCount: number | null;
   recommendedAt: string | null;
+  author?: string | null;
 };
 
 export type FoundLink = RawPost & {
   youtubeId: string;
   sourceKey: string;
-  platform: "reddit" | "hacker_news";
+  platform: "hacker_news" | "forum" | "other";
 };
 
 function decodeEntities(value: string): string {
@@ -74,28 +75,70 @@ function dateOnly(value: string | null): string | null {
   return date.toISOString().slice(0, 10);
 }
 
-export function parseRedditRss(xml: string): RawPost[] {
-  const posts: RawPost[] = [];
+export function parseYouTubeUploads(xml: string): { channelTitle: string; videos: { id: string; title: string; published: string | null }[] } {
+  const channelTitle = plainText(xml.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "");
+  const videos = [];
   for (const chunk of xml.split("<entry>").slice(1)) {
     const entry = chunk.split("</entry>")[0] ?? "";
-    const link = entry.match(/<link[^>]*href="([^"]+)"/)?.[1] ?? "";
-    const rawTitle = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "";
-    const rawContent = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] ?? "";
-    const hrefs = [...entry.matchAll(/href="([^"]+)"/g)].map((match) => decodeEntities(match[1]));
-    const published = entry.match(/<published>([^<]+)<\/published>/)?.[1] ?? null;
-    const title = plainText(rawTitle);
-    const text = `${title} ${plainText(rawContent)} ${hrefs.join(" ")}`.trim();
-    if (!link) continue;
-    posts.push({
-      sourceUrl: decodeEntities(link),
-      text,
-      excerpt: postSummary(rawTitle, rawContent),
-      sourceScore: null,
-      commentCount: null,
-      recommendedAt: dateOnly(published),
+    const id = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1]?.trim() ?? "";
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) continue;
+    videos.push({
+      id,
+      title: plainText(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? ""),
+      published: entry.match(/<published>([^<]+)<\/published>/)?.[1] ?? null,
     });
   }
-  return posts;
+  return { channelTitle, videos };
+}
+
+type MastoStatus = {
+  content?: string;
+  url?: string;
+  created_at?: string;
+  account?: { display_name?: string; acct?: string };
+};
+
+export function parseMastodonStatuses(statuses: MastoStatus[]): RawPost[] {
+  return statuses.flatMap((status) => {
+    if (!status.url) return [];
+    const text = plainText(status.content ?? "");
+    return [
+      {
+        sourceUrl: status.url,
+        text: `${text} ${status.content ?? ""}`,
+        excerpt: postSummary(text.slice(0, 120), text),
+        sourceScore: null,
+        commentCount: null,
+        recommendedAt: dateOnly(status.created_at ?? null),
+        author: status.account?.display_name || status.account?.acct || null,
+      },
+    ];
+  });
+}
+
+type LemmyPost = {
+  post?: { name?: string; body?: string | null; url?: string | null; ap_id?: string; published?: string };
+  creator?: { name?: string; display_name?: string | null };
+};
+
+export function parseLemmyPosts(posts: LemmyPost[], communityUrl: string): RawPost[] {
+  return posts.flatMap((item) => {
+    const post = item.post;
+    if (!post?.ap_id && !post?.url) return [];
+    const title = post.name ?? "";
+    const body = post.body ?? "";
+    return [
+      {
+        sourceUrl: post.ap_id || `${communityUrl}`,
+        text: `${title} ${body} ${post.url ?? ""}`,
+        excerpt: postSummary(title, body),
+        sourceScore: null,
+        commentCount: null,
+        recommendedAt: dateOnly(post.published ?? null),
+        author: item.creator?.display_name || item.creator?.name || null,
+      },
+    ];
+  });
 }
 
 type HnHit = {
@@ -108,6 +151,7 @@ type HnHit = {
   points?: number | null;
   num_comments?: number | null;
   created_at?: string | null;
+  author?: string | null;
 };
 
 export function parseHnHits(hits: HnHit[]): RawPost[] {
@@ -124,6 +168,7 @@ export function parseHnHits(hits: HnHit[]): RawPost[] {
         sourceScore: typeof hit.points === "number" ? hit.points : null,
         commentCount: typeof hit.num_comments === "number" ? hit.num_comments : null,
         recommendedAt: dateOnly(hit.created_at ?? null),
+        author: hit.author ?? null,
       },
     ];
   });
@@ -131,7 +176,7 @@ export function parseHnHits(hits: HnHit[]): RawPost[] {
 
 export function linksInPosts(
   posts: RawPost[],
-  platform: "reddit" | "hacker_news",
+  platform: "hacker_news" | "forum" | "other",
   sourceKey: string,
 ): FoundLink[] {
   const found: FoundLink[] = [];

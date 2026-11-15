@@ -2,54 +2,122 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COLLECTOR_USER_AGENT } from "@/lib/config";
-import { linksInPosts, parseHnHits, parseRedditRss, postSummary, type FoundLink } from "@/lib/feeds";
+import { linksInPosts, parseHnHits, parseLemmyPosts, parseMastodonStatuses, parseYouTubeUploads, postSummary, type FoundLink } from "@/lib/feeds";
 import { sourceConfigFor } from "@/lib/source-config";
 import type { SourceConfig } from "@/lib/types";
 import { fetchVideosList, metadataRow } from "@/lib/youtube";
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const OWNER_SCORE = 1;
+const INDEPENDENT_SCORE = 3;
 
-let redditJsonBlocked = false;
-
-async function redditPosts(subreddit: string) {
-  const headers = { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml" };
-  if (!redditJsonBlocked) {
-    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=100`, { headers });
-    if (jsonResponse.status === 403) redditJsonBlocked = true;
-    if (jsonResponse.ok) {
-      const body = (await jsonResponse.json()) as {
-        data?: { children?: { data?: Record<string, unknown> }[] };
-      };
-      return (body.data?.children ?? []).flatMap((child) => {
-        const data = child.data ?? {};
-        const permalink = typeof data.permalink === "string" ? `https://www.reddit.com${data.permalink}` : "";
-        const text = [data.title, data.selftext, data.url].filter((item) => typeof item === "string").join(" ");
-        if (!permalink) return [];
-        return [
-          {
-            sourceUrl: permalink,
-            text,
-            excerpt: postSummary(String(data.title ?? ""), String(data.selftext ?? "")),
-            sourceScore: typeof data.score === "number" ? data.score : null,
-            commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
-            recommendedAt:
-              typeof data.created_utc === "number"
-                ? new Date(data.created_utc * 1000).toISOString().slice(0, 10)
-                : null,
-          },
-        ];
-      });
-    }
-  }
-  let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
-  if (rssResponse.status === 429) {
-    await pause(8000);
-    rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
-  }
-  if (!rssResponse.ok) throw new Error(`Reddit r/${subreddit} returned ${rssResponse.status}.`);
-  return parseRedditRss(await rssResponse.text());
+function sameName(left: string | null | undefined, right: string | null | undefined): boolean {
+  const a = left?.trim().toLowerCase() ?? "";
+  const b = right?.trim().toLowerCase() ?? "";
+  if (a.length < 4 || b.length < 4) return false;
+  return a === b || a.includes(b) || b.includes(a);
 }
 
+async function readText(url: string): Promise<string | null> {
+  const response = await fetch(url, { headers: { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml, application/xml" } });
+  if (response.status === 429) return null;
+  if (!response.ok) throw new Error(`${url} returned ${response.status}.`);
+  return response.text();
+}
+
+async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; counts: Record<string, number>; errors: string[] }> {
+  const links: FoundLink[] = [];
+  const counts: Record<string, number> = {};
+  const errors: string[] = [];
+  const channelTitleByVideo = new Map<string, string>();
+
+  for (const channelId of config.channels) {
+    const key = `yt-channel:${channelId}`;
+    try {
+      const xml = await readText(`https://www.youtube.com/xml/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`);
+      if (xml == null) {
+        errors.push(`${key} was rate limited.`);
+        break;
+      }
+      const feed = parseYouTubeUploads(xml);
+      counts[key] = feed.videos.length;
+      for (const video of feed.videos) {
+        channelTitleByVideo.set(video.id, feed.channelTitle);
+        links.push({
+          sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
+          text: `https://www.youtube.com/watch?v=${video.id}`,
+          excerpt: postSummary(video.title, ""),
+          sourceScore: OWNER_SCORE,
+          commentCount: null,
+          recommendedAt: video.published ? video.published.slice(0, 10) : null,
+          youtubeId: video.id,
+          sourceKey: key,
+          platform: "other",
+        });
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `${key} failed.`);
+    }
+  }
+
+  const noteShare = (post: FoundLink) => {
+    const owner = sameName(post.author, channelTitleByVideo.get(post.youtubeId));
+    post.sourceScore = owner ? OWNER_SCORE : INDEPENDENT_SCORE;
+    return post;
+  };
+
+  for (const tag of config.mastodon) {
+    const key = `mastodon:#${tag}`;
+    try {
+      const body = await readText(`https://mastodon.social/api/v1/timelines/tag/${encodeURIComponent(tag)}?limit=40`);
+      if (body == null) {
+        errors.push(`${key} was rate limited.`);
+        break;
+      }
+      const posts = parseMastodonStatuses(JSON.parse(body) as Parameters<typeof parseMastodonStatuses>[0]);
+      const found = linksInPosts(posts, "forum", key).map(noteShare);
+      counts[key] = found.length;
+      links.push(...found);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `${key} failed.`);
+    }
+  }
+
+  for (const community of config.lemmy) {
+    const key = `lemmy:${community}`;
+    const [host, , name] = community.split("/");
+    try {
+      const body = await readText(`https://${host}/api/v3/post/list?community_name=${encodeURIComponent(name ?? "")}&type_=All&sort=New&limit=40`);
+      if (body == null) {
+        errors.push(`${key} was rate limited.`);
+        continue;
+      }
+      const parsed = JSON.parse(body) as { posts?: Parameters<typeof parseLemmyPosts>[0] };
+      const posts = parseLemmyPosts(parsed.posts ?? [], `https://${community}`);
+      const found = linksInPosts(posts, "forum", key).map(noteShare);
+      counts[key] = found.length;
+      links.push(...found);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `${key} failed.`);
+    }
+  }
+
+  if (config.hn) {
+    let hn = 0;
+    for (const keyword of config.keywords) {
+      try {
+        const posts = await hnPosts(keyword);
+        const found = linksInPosts(posts, "hacker_news", "hn:").map(noteShare);
+        hn += found.length;
+        links.push(...found);
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : "Hacker News search failed.");
+      }
+    }
+    counts["hn:"] = hn;
+  }
+
+  return { links, counts, errors };
+}
 async function hnPosts(keyword: string) {
   const posts = [];
   for (const tags of ["story", "comment"]) {
@@ -65,49 +133,22 @@ async function hnPosts(keyword: string) {
   return posts;
 }
 
-async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; warnings: string[] }> {
-  const links: FoundLink[] = [];
-  const warnings: string[] = [];
-  for (const [index, subreddit] of config.subreddits.entries()) {
-    if (index > 0) await pause(5000);
-    try {
-      const posts = await redditPosts(subreddit);
-      links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
-    } catch (error) {
-      warnings.push(error instanceof Error ? error.message : `Reddit r/${subreddit} failed.`);
-    }
-  }
-  if (config.hn) {
-    for (const keyword of config.keywords) {
-      try {
-        const posts = await hnPosts(keyword);
-        links.push(...linksInPosts(posts, "hacker_news", "hn:"));
-      } catch (error) {
-        warnings.push(error instanceof Error ? error.message : "Hacker News search failed.");
-      }
-    }
-  }
-  return { links, warnings };
-}
-
 export async function collectTopic(
   admin: SupabaseClient,
   topic: { id: string; slug: string; source_config?: unknown },
-): Promise<{ added: number; sources: number; error?: string }> {
+): Promise<{ added: number; sources: number; counts: Record<string, number>; errors: string[]; error?: string }> {
   const config = sourceConfigFor(topic.slug, topic.source_config);
   const gathered = await gather(config);
-  const links = gathered.links;
-  if (gathered.warnings.length > 0) {
-    console.error("collect warnings", topic.slug, gathered.warnings.join(" "));
-  }
+  const { counts, errors } = gathered;
+  if (errors.length) console.error("collect warnings", topic.slug, errors.join(" "));
 
   const unique = new Map<string, FoundLink>();
-  for (const link of links) {
+  for (const link of gathered.links) {
     const key = `${link.youtubeId} ${link.sourceUrl}`;
     if (!unique.has(key)) unique.set(key, link);
   }
   const found = [...unique.values()];
-  if (found.length === 0) return { added: 0, sources: 0 };
+  if (found.length === 0) return { added: 0, sources: 0, counts, errors };
 
   const verified: FoundLink[] = [];
   for (const link of found) {
@@ -116,7 +157,7 @@ export async function collectTopic(
     );
     if (oembed.ok) verified.push(link);
   }
-  if (verified.length === 0) return { added: 0, sources: 0 };
+  if (verified.length === 0) return { added: 0, sources: 0, counts, errors };
 
   let metadata;
   try {
@@ -124,7 +165,7 @@ export async function collectTopic(
   } catch (error) {
     const message = error instanceof Error ? error.message : "videos.list failed.";
     console.error("collect availability failed", topic.slug, message);
-    return { added: 0, sources: 0, error: message };
+    return { added: 0, sources: 0, counts, errors, error: message };
   }
 
   let added = 0;
@@ -187,22 +228,8 @@ export async function collectTopic(
       source_score: link.sourceScore,
       comment_count: link.commentCount,
     });
-    if (error?.message.includes("source_key") || error?.message.includes("source_score") || error?.message.includes("comment_count")) {
-      const retry = await admin.from("recommendation_sources").insert({
-        topic_id: topic.id,
-        video_id: video.id,
-        platform: link.platform,
-        source_url: link.sourceUrl,
-        quote_or_summary: link.excerpt,
-        recommended_at: link.recommendedAt,
-      });
-      if (!retry.error) sources += 1;
-      else console.error("source insert failed", retry.error.message);
-      continue;
-    }
     if (!error) sources += 1;
-    else console.error("source insert failed", error.message);
   }
 
-  return { added, sources };
+  return { added, sources, counts, errors };
 }

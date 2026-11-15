@@ -14,6 +14,8 @@ export async function runDaily(
   sources: number;
   pickDate?: string;
   picks?: { slot: number; youtubeId?: string; whyLine: string }[];
+  counts?: Record<string, number>;
+  errors?: string[];
   gap?: string;
   skipped?: string;
   error?: string;

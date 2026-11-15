@@ -2,32 +2,45 @@ import type { SourceConfig } from "@/lib/types";
 
 export const SOURCE_DEFAULTS: Record<string, SourceConfig> = {
   starfield: {
+    channels: [],
     hn: false,
-    subreddits: ["Starfield", "starfieldmods"],
     keywords: ["starfield"],
+    mastodon: ["starfield"],
+    lemmy: ["lemmy.zip/c/starfield"],
   },
   "ai-game-dev": {
+    channels: [],
     hn: true,
-    subreddits: ["aigamedev", "gamedev"],
     keywords: ["AI game development", "AI npc", "generative game"],
+    mastodon: ["gamedev", "indiedev"],
+    lemmy: ["programming.dev/c/gamedev"],
   },
 };
 
+function stringList(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const items = value.map((item) => String(item).trim()).filter(Boolean);
+  return items.length ? items : fallback;
+}
+
 export function sourceConfigFor(slug: string, raw: unknown): SourceConfig {
-  const fallback = SOURCE_DEFAULTS[slug] ?? { hn: false, subreddits: [], keywords: [] };
+  const fallback = SOURCE_DEFAULTS[slug] ?? {
+    channels: [],
+    hn: false,
+    keywords: [],
+    mastodon: [],
+    lemmy: [],
+  };
   if (!raw || typeof raw !== "object") return fallback;
   const record = raw as Record<string, unknown>;
-  const subreddits = Array.isArray(record.subreddits)
-    ? record.subreddits.map((item) => String(item).replace(/^r\//i, "")).filter(Boolean)
-    : fallback.subreddits;
-  const keywords = Array.isArray(record.keywords)
-    ? record.keywords.map((item) => String(item)).filter(Boolean)
-    : fallback.keywords;
-  const hn = typeof record.hn === "boolean" ? record.hn : fallback.hn;
   return {
-    hn,
-    subreddits: subreddits.length ? subreddits : fallback.subreddits,
-    keywords: keywords.length ? keywords : fallback.keywords,
+    channels: Array.isArray(record.channels)
+      ? record.channels.map((item) => String(item).trim()).filter(Boolean)
+      : fallback.channels,
+    hn: typeof record.hn === "boolean" ? record.hn : fallback.hn,
+    keywords: stringList(record.keywords, fallback.keywords),
+    mastodon: stringList(record.mastodon, fallback.mastodon).map((tag) => tag.replace(/^#/, "")),
+    lemmy: stringList(record.lemmy, fallback.lemmy),
   };
 }
 
