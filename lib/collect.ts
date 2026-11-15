@@ -9,36 +9,41 @@ import { fetchVideosList, metadataRow } from "@/lib/youtube";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let redditJsonBlocked = false;
+
 async function redditPosts(subreddit: string) {
   const headers = { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml" };
-  const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
-  if (jsonResponse.ok) {
-    const body = (await jsonResponse.json()) as {
-      data?: { children?: { data?: Record<string, unknown> }[] };
-    };
-    return (body.data?.children ?? []).flatMap((child) => {
-      const data = child.data ?? {};
-      const permalink = typeof data.permalink === "string" ? `https://www.reddit.com${data.permalink}` : "";
-      const text = [data.title, data.selftext, data.url].filter((item) => typeof item === "string").join(" ");
-      if (!permalink) return [];
-      return [
-        {
-          sourceUrl: permalink,
-          text,
-          excerpt: String(data.title ?? text).slice(0, 400),
-          sourceScore: typeof data.score === "number" ? data.score : null,
-          commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
-          recommendedAt:
-            typeof data.created_utc === "number"
-              ? new Date(data.created_utc * 1000).toISOString().slice(0, 10)
-              : null,
-        },
-      ];
-    });
+  if (!redditJsonBlocked) {
+    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
+    if (jsonResponse.status === 403) redditJsonBlocked = true;
+    if (jsonResponse.ok) {
+      const body = (await jsonResponse.json()) as {
+        data?: { children?: { data?: Record<string, unknown> }[] };
+      };
+      return (body.data?.children ?? []).flatMap((child) => {
+        const data = child.data ?? {};
+        const permalink = typeof data.permalink === "string" ? `https://www.reddit.com${data.permalink}` : "";
+        const text = [data.title, data.selftext, data.url].filter((item) => typeof item === "string").join(" ");
+        if (!permalink) return [];
+        return [
+          {
+            sourceUrl: permalink,
+            text,
+            excerpt: String(data.title ?? text).slice(0, 400),
+            sourceScore: typeof data.score === "number" ? data.score : null,
+            commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
+            recommendedAt:
+              typeof data.created_utc === "number"
+                ? new Date(data.created_utc * 1000).toISOString().slice(0, 10)
+                : null,
+          },
+        ];
+      });
+    }
   }
   let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
   if (rssResponse.status === 429) {
-    await pause(2000);
+    await pause(8000);
     rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
   }
   if (!rssResponse.ok) throw new Error(`Reddit r/${subreddit} returned ${rssResponse.status}.`);
@@ -64,7 +69,7 @@ async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; warni
   const links: FoundLink[] = [];
   const warnings: string[] = [];
   for (const [index, subreddit] of config.subreddits.entries()) {
-    if (index > 0) await pause(2000);
+    if (index > 0) await pause(5000);
     try {
       const posts = await redditPosts(subreddit);
       links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
