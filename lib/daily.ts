@@ -7,7 +7,17 @@ import { pickTopic } from "@/lib/pick-topic";
 export async function runDaily(
   admin: SupabaseClient,
   onlySlug?: string,
-): Promise<{ slug: string; added: number; sources: number; pickDate?: string; gap?: string; skipped?: string; error?: string }[]> {
+  date?: string,
+): Promise<{
+  slug: string;
+  added: number;
+  sources: number;
+  pickDate?: string;
+  picks?: { slot: number; youtubeId?: string; whyLine: string }[];
+  gap?: string;
+  skipped?: string;
+  error?: string;
+}[]> {
   let query = admin.from("topics").select("id, slug, source_config").eq("status", "live");
   if (onlySlug) query = query.eq("slug", onlySlug);
   const { data: topics, error } = await query;
@@ -16,7 +26,7 @@ export async function runDaily(
   const results = [];
   for (const topic of topics ?? []) {
     const collected = await collectTopic(admin, topic);
-    const picked = collected.error ? { gap: collected.error } : await pickTopic(admin, topic);
+    const picked = collected.error ? { gap: collected.error } : await pickTopic(admin, topic, date ? { date } : undefined);
     results.push({ slug: topic.slug as string, ...collected, ...picked });
   }
   return results;

@@ -71,6 +71,7 @@ describe("chooseFromPool", () => {
       recentSourceKeys: [],
       channelRates: null,
       model: null,
+      count: 1,
     });
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.gap, MISSING_KEY_MESSAGE);
@@ -81,7 +82,7 @@ describe("chooseFromPool", () => {
     let seen = "";
     const model: PickModel = async (prompt) => {
       seen = prompt;
-      return { videoId: "video-1", whyLine: "Recommended on r/Starfield.", rationale: "Only source with a post." };
+      return [{ videoId: "video-1", whyLine: "Recommended on r/Starfield.", rationale: "Only source with a post." }];
     };
     const result = await chooseFromPool({
       candidates: [candidate("video-1", "reddit:r/Starfield")],
@@ -89,11 +90,12 @@ describe("chooseFromPool", () => {
       recentSourceKeys: [],
       channelRates: null,
       model,
+      count: 1,
     });
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.choice.videoId, "video-1");
-      assert.equal(result.choice.whyLine, "Recommended on r/Starfield.");
+      assert.equal(result.choices[0]?.videoId, "video-1");
+      assert.equal(result.choices[0]?.whyLine, "Recommended on r/Starfield.");
     }
     assert.match(seen, /reddit:r\/Starfield/);
     assert.match(seen, /people recommended this ship tour/);
@@ -112,6 +114,7 @@ describe("chooseFromPool", () => {
       recentSourceKeys: [],
       channelRates: null,
       model,
+      count: 1,
     });
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.gap, "anthropic down");
@@ -119,13 +122,14 @@ describe("chooseFromPool", () => {
 
   it("rejects a video id that was not offered", async () => {
     mock.method(console, "error", () => {});
-    const model: PickModel = async () => ({ videoId: "other", whyLine: "nope", rationale: "nope" });
+    const model: PickModel = async () => [{ videoId: "other", whyLine: "nope", rationale: "nope" }];
     const result = await chooseFromPool({
       candidates: [candidate("video-1", "hn:")],
       rates: new Map(),
       recentSourceKeys: [],
       channelRates: null,
       model,
+      count: 1,
     });
     assert.equal(result.ok, false);
   });

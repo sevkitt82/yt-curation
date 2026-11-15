@@ -17,7 +17,10 @@ export function VideoCard({ pick, topicId, topicSlug }: { pick: PublicPick; topi
         )}
       </TrackedLink>
       <div className="flex flex-col gap-2">
-        <p className="text-xs uppercase tracking-wide text-[var(--muted)]">{formatDate(pick.pickDate)}</p>
+        <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+          {formatDate(pick.pickDate)}
+          {pick.pickSlot ? ` · ${pick.pickSlot} of 3` : ""}
+        </p>
         <h2 className="text-xl">
           <TrackedLink href={href} eventName="video_card_click" topicId={topicId} videoId={video.id} className="text-[var(--ink)]">
             {video.title ?? "Untitled video"}

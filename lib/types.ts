@@ -52,6 +52,7 @@ export type PublicPick = {
   topicVideoId: string;
   whyLine: string;
   pickDate: string;
+  pickSlot: number | null;
   level: Level | null;
   lengthBucket: LengthBucket | null;
   video: VideoRow;

@@ -1,12 +1,12 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { runDaily } from "@/lib/daily";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { laToday } from "@/lib/time";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
   const admin = createAdminClient();
@@ -14,7 +14,10 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "SUPABASE_SECRET_KEY is not set." }, { status: 500 });
   }
   try {
-    const topics = await runDaily(admin);
+    const url = new URL(request.url);
+    const slug = url.searchParams.get("slug")?.trim();
+    const today = url.searchParams.get("today") === "1";
+    const topics = await runDaily(admin, slug && /^[a-z0-9-]+$/.test(slug) ? slug : undefined, today ? laToday() : undefined);
     return Response.json({ ok: true, topics });
   } catch (error) {
     console.error("daily job failed", error instanceof Error ? error.message : "unknown");
