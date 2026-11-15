@@ -65,15 +65,16 @@ async function hnPosts(keyword: string) {
   return posts;
 }
 
-async function gather(config: SourceConfig): Promise<FoundLink[]> {
+async function gather(config: SourceConfig): Promise<{ links: FoundLink[]; warnings: string[] }> {
   const links: FoundLink[] = [];
+  const warnings: string[] = [];
   for (const [index, subreddit] of config.subreddits.entries()) {
     if (index > 0) await pause(5000);
     try {
       const posts = await redditPosts(subreddit);
       links.push(...linksInPosts(posts, "reddit", `reddit:r/${subreddit}`));
     } catch (error) {
-      console.error(error instanceof Error ? error.message : `Reddit r/${subreddit} failed.`);
+      warnings.push(error instanceof Error ? error.message : `Reddit r/${subreddit} failed.`);
     }
   }
   if (config.hn) {
@@ -82,11 +83,11 @@ async function gather(config: SourceConfig): Promise<FoundLink[]> {
         const posts = await hnPosts(keyword);
         links.push(...linksInPosts(posts, "hacker_news", "hn:"));
       } catch (error) {
-        console.error(error instanceof Error ? error.message : "Hacker News search failed.");
+        warnings.push(error instanceof Error ? error.message : "Hacker News search failed.");
       }
     }
   }
-  return links;
+  return { links, warnings };
 }
 
 export async function collectTopic(
@@ -94,13 +95,10 @@ export async function collectTopic(
   topic: { id: string; slug: string; source_config?: unknown },
 ): Promise<{ added: number; sources: number; error?: string }> {
   const config = sourceConfigFor(topic.slug, topic.source_config);
-  let links: FoundLink[];
-  try {
-    links = await gather(config);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Collection failed.";
-    console.error("collect failed", topic.slug, message);
-    return { added: 0, sources: 0, error: message };
+  const gathered = await gather(config);
+  const links = gathered.links;
+  if (gathered.warnings.length > 0) {
+    console.error("collect warnings", topic.slug, gathered.warnings.join(" "));
   }
 
   const unique = new Map<string, FoundLink>();
@@ -189,7 +187,21 @@ export async function collectTopic(
       source_score: link.sourceScore,
       comment_count: link.commentCount,
     });
+    if (error?.message.includes("source_key") || error?.message.includes("source_score") || error?.message.includes("comment_count")) {
+      const retry = await admin.from("recommendation_sources").insert({
+        topic_id: topic.id,
+        video_id: video.id,
+        platform: link.platform,
+        source_url: link.sourceUrl,
+        quote_or_summary: link.excerpt,
+        recommended_at: link.recommendedAt,
+      });
+      if (!retry.error) sources += 1;
+      else console.error("source insert failed", retry.error.message);
+      continue;
+    }
     if (!error) sources += 1;
+    else console.error("source insert failed", error.message);
   }
 
   return { added, sources };
