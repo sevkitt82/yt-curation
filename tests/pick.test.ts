@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it, mock } from "node:test";
-import { cleanStoredQuote, linksInPosts, parseRedditRss } from "../lib/feeds";
+import { cleanStoredQuote, parseYouTubeUploads } from "../lib/feeds";
 import {
   MISSING_KEY_MESSAGE,
   chooseFromPool,
@@ -145,11 +145,14 @@ describe("dates and sources", () => {
   it("uses the owner's source defaults", () => {
     const starfield = sourceConfigFor("starfield", {});
     assert.equal(starfield.hn, false);
-    assert.deepEqual(starfield.subreddits, ["Starfield", "starfieldmods"]);
+    assert.deepEqual(starfield.channels, []);
+    assert.deepEqual(starfield.mastodon, ["starfield"]);
+    assert.deepEqual(starfield.lemmy, ["lemmy.zip/c/starfield"]);
     const ai = sourceConfigFor("ai-game-dev", {});
     assert.equal(ai.hn, true);
-    assert.deepEqual(ai.subreddits, ["aigamedev", "gamedev"]);
-    assert.equal(ai.subreddits.includes("proceduralgeneration"), false);
+    assert.deepEqual(ai.channels, []);
+    assert.deepEqual(ai.mastodon, ["gamedev", "indiedev"]);
+    assert.deepEqual(ai.lemmy, ["programming.dev/c/gamedev"]);
   });
 
   it("builds reddit and hn source keys", () => {
@@ -157,22 +160,14 @@ describe("dates and sources", () => {
     assert.equal(sourceKeyFor("hacker_news", "https://news.ycombinator.com/item?id=1"), "hn:");
   });
 
-  it("reads a YouTube id out of a Reddit feed entry", () => {
-    const xml = `<feed><entry><link href="https://www.reddit.com/r/Starfield/comments/abc/title/" /><title>Watch</title><content>https://youtu.be/dQw4w9WgXcQ</content><published>2026-11-01T00:00:00+00:00</published></entry></feed>`;
-    const links = linksInPosts(parseRedditRss(xml), "reddit", "reddit:r/Starfield");
-    assert.equal(links.length, 1);
-    assert.equal(links[0]?.youtubeId, "dQw4w9WgXcQ");
-    assert.equal(links[0]?.sourceKey, "reddit:r/Starfield");
+  it("reads a video id from a channel upload feed", () => {
+    const xml = `<feed><title>Example</title><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><title>Watch</title><published>2026-11-01T00:00:00+00:00</published></entry></feed>`;
+    const feed = parseYouTubeUploads(xml);
+    assert.equal(feed.videos[0]?.id, "dQw4w9WgXcQ");
+    assert.equal(feed.channelTitle, "Example");
   });
 
-  it("stores a reddit post as a title and a short plain excerpt", () => {
-    const xml = `<feed><entry><link href="https://www.reddit.com/r/starfieldmods/comments/abc/starfield_manual_leaning/" /><title>Starfield Manual Leaning</title><content>&lt;table&gt;&lt;!-- SC_OFF --&gt;&lt;p&gt;Working in first and third person.&lt;/p&gt;&amp;#32; submitted by &amp;#32; &lt;a href="https://www.reddit.com/user/x"&gt;/u/x&lt;/a&gt; https://youtu.be/abcdefghijk</content></entry></feed>`;
-    const [post] = parseRedditRss(xml);
-    assert.equal(post?.excerpt.startsWith("Starfield Manual Leaning\n"), true);
-    assert.equal(post?.excerpt.includes("<"), false);
-    assert.equal(post?.excerpt.includes("submitted by"), false);
-    assert.ok((post?.excerpt.length ?? 0) <= 200);
-    assert.equal(post?.text.includes("abcdefghijk"), true);
+  it("stores a plain excerpt without markup", () => {
     const cleaned = cleanStoredQuote(
       `Starfield Manual Leaning <table> <tr><td> <!-- SC_OFF --><p>Working in first and third person.</p> &#32; submitted by &#32; <a href="/u/x">/u/x</a>`,
     );

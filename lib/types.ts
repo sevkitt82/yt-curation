@@ -8,9 +8,11 @@ export type Topic = {
 };
 
 export type SourceConfig = {
+  channels: string[];
   hn: boolean;
-  subreddits: string[];
   keywords: string[];
+  mastodon: string[];
+  lemmy: string[];
 };
 
 export type VideoRow = {

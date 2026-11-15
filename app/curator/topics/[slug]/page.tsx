@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { addVideos, runTopicDaily, saveWhyLine, updateCorrection, vetoPick } from "@/app/actions/curator";
+import { addVideos, runTopicDaily, saveChannels, saveWhyLine, updateCorrection, vetoPick } from "@/app/actions/curator";
 import { curatorCanEdit, getCurator } from "@/lib/curator";
 import { ratesFromPicks, smoothedRate } from "@/lib/pick-logic";
-import { sourceKeyFor } from "@/lib/source-config";
+import { sourceConfigFor, sourceKeyFor } from "@/lib/source-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { addIsoDays, earliestPickDate, formatDate, laToday } from "@/lib/time";
 
@@ -35,7 +35,7 @@ async function CuratorTopic({
   if (curator.status !== "ok") redirect("/curator");
   const supabase = await createServerSupabase();
   if (!supabase) notFound();
-  const { data: topic } = await supabase.from("topics").select("id, slug, name").eq("slug", slug).maybeSingle();
+  const { data: topic } = await supabase.from("topics").select("id, slug, name, source_config").eq("slug", slug).maybeSingle();
   if (!topic || !curatorCanEdit(curator.appUser, topic.id)) notFound();
 
   const today = laToday();
@@ -221,6 +221,16 @@ async function CuratorTopic({
       </section>
 
       <section className="card p-4">
+        <h2 className="text-2xl">Trusted channels</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">YouTube channel ids, one per line. Leave this empty until you have ids to trust.</p>
+        <form action={saveChannels} className="mt-3 grid gap-3">
+          <input type="hidden" name="slug" value={topic.slug} />
+          <textarea name="channels" rows={4} defaultValue={sourceConfigFor(topic.slug, topic.source_config).channels.join("\n")} />
+          <button className="btn w-fit">Save channels</button>
+        </form>
+      </section>
+
+      <section className="card p-4">
         <h2 className="text-2xl">Add a candidate</h2>
         <form action={addVideos} className="mt-3 grid gap-3">
           <input type="hidden" name="slug" value={topic.slug} />
@@ -238,8 +248,7 @@ async function CuratorTopic({
           </label>
           <label className="field">
             Platform
-            <select name="platform" defaultValue="reddit">
-              <option value="reddit">reddit</option>
+            <select name="platform" defaultValue="other">
               <option value="hacker_news">hacker news</option>
               <option value="forum">forum</option>
               <option value="other">other</option>
