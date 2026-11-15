@@ -1,0 +1,308 @@
+[
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "5b5Fl7kn-cE",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/1rzrivv/this_is_the_video_yall_need/",
+        "quote_or_summary": "The poster says this is the video that finally got an AI editor building inside a game engine, and tells people who are stuck to follow it.",
+        "recommended_at": "2026-03-21"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "ojuCvP1t0eQ",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/1lohgt9/controlling_the_unreal_editor_with_an_llm/",
+        "quote_or_summary": "Shared as a demo of controlling the Unreal Editor with an LLM. A commenter replied: \"Very cool. Love to see where this tech goes.\"",
+        "recommended_at": "2025-07-01"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "ismWniiT8ew",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/11sniv3/how_to_create_consistent_pixel_art_animation_with/",
+        "quote_or_summary": "A commenter called it a \"Great tutorial.\" Another said they had watched it and that the technique was clever.",
+        "recommended_at": "2023-03-16"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "KbrFHO-1PnQ",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/1uxeqny/a_tutorial_on_making_seamless_character_animation/",
+        "quote_or_summary": "Posted because people had asked for the tutorial. One reply: \"omg tyvm you actually followed up, amazing!\"",
+        "recommended_at": "2026-07-16"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "KS8QwqfPlQw",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/gamedev/comments/1fftbvq/cursor_like_ai_platform_for_unity/",
+        "quote_or_summary": "On a thread asking for a Cursor-like tool for Unity, a commenter wrote: \"You can integrate cursor into Unity. Here's how to do it\" and linked this video.",
+        "recommended_at": "2024-09-21"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "PBA8I-fltAA",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/1hxzdoc/install_spar3d_locally_3d_reconstruction_from/",
+        "quote_or_summary": "Posted as a local install tutorial for SPAR3D, described as \"Another good looking 3d mesh generating model, decently licensed.\" A later comment points at the same tutorial.",
+        "recommended_at": "2025-01-10"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "IJcuQQ1eWWI",
+    "sources": [
+      {
+        "platform": "hacker_news",
+        "source_url": "https://news.ycombinator.com/item?id=4480266",
+        "quote_or_summary": "Answering someone who wanted game applications of an AI course, a commenter linked Soren Johnson's Civilization AI talk and wrote: \"Its a very good talk, but applied video game AI as a field is kind of a let down.\"",
+        "recommended_at": "2012-09-05"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "Y1D5_W7CHQU",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/1ga627t/a_new_ai_driven_character_animation_creator_full/",
+        "quote_or_summary": "Shared on r/aigamedev as a full walkthrough, with the note: \"Unity has been pushing genAI research pretty hard. Nice to see some productization.\"",
+        "recommended_at": "2024-10-23"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "Lm_AzK27mZY",
+    "sources": [
+      {
+        "platform": "hacker_news",
+        "source_url": "https://news.ycombinator.com/item?id=47234227",
+        "quote_or_summary": "In a thread about AI in games, a commenter points at the Game Maker's Toolkit video on the Nemesis system: \"This video is a great look at what it is and why its great IMO.\"",
+        "recommended_at": "2026-03-02"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "DRlhpzc7ImA",
+    "sources": [
+      {
+        "platform": "hacker_news",
+        "source_url": "https://news.ycombinator.com/item?id=47234227",
+        "quote_or_summary": "Same thread. A commenter points at the ARC Raiders documentary for how the reinforcement-learning locomotion was built: \"Here's the documentary explaining how the RL locomotion works.\"",
+        "recommended_at": "2026-03-02"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "FKoy7bncHLs",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/aigamedev/comments/10cdzmf/turn_ai_images_into_3d_animated_characters/",
+        "quote_or_summary": "Posted as a tutorial for turning AI images into 3D animated characters. The poster also tells people to follow Prompt Muse's channel for more of the same.",
+        "recommended_at": "2023-01-15"
+      }
+    ]
+  },
+  {
+    "topic_slug": "ai-game-dev",
+    "youtube_id": "2gARJpDG7Jo",
+    "sources": [
+      {
+        "platform": "hacker_news",
+        "source_url": "https://news.ycombinator.com/item?id=44455405",
+        "quote_or_summary": "The commenter shared their own unedited clip: \"Here's an on the fly video I made (no retakes) of Claude generating a Godot scene file.\"",
+        "recommended_at": "2025-07-03"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "uMOPoAq5vIA",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/15v1cgo/ive_seen_a_bit_of_gameplay_but_could_someone_help/",
+        "quote_or_summary": "Asked what kind of game Starfield is, a commenter said: \"You should go watch the Starfield Direct gameplay deep dive. It’s a 45 minute video on youtube that will tell you everything you need to know about the game.\"",
+        "recommended_at": "2023-08-19"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "kfYEiTdsyas",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/148101t/re_240_high_quality_screenshots_from_the_deep/",
+        "quote_or_summary": "Cited as Bethesda's official gameplay trailer. The post pulled stills from the 4K videos Bethesda uploaded to YouTube after the showcase.",
+        "recommended_at": "2023-06-12"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "sp6R3U5TOMY",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/15krtjs/here_are_some_extra_tidbits_i_pulled_out_of_lex/",
+        "quote_or_summary": "A commenter on the notes thread: \"Watched this the other day and it’s absolutely fantastic.\"",
+        "recommended_at": "2023-08-07"
+      },
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/15lapdb/is_this_enough_info_or_what_best_deep_dives_ive/",
+        "quote_or_summary": "The post calls Lex Marston's breakdown \"one of the best deep dives into Starfield\" and says it is worth watching in parts.",
+        "recommended_at": "2023-08-08"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "i9ikne_9iEI",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/14a7rfm/has_anyone_found_a_super_in_depth_look_at_the/",
+        "quote_or_summary": "Recommended for the technical side of the Direct: \"I like Digital Foundry's analysis, although they don't focus on the gameplay but on the technical side, graphics, rendering, lighting...\"",
+        "recommended_at": "2023-06-15"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "ti30Yd2-2U0",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/1czurhn/ship_building_channels/",
+        "quote_or_summary": "Recommended on a ship-building thread: \"I use this guide in every new game. To me its the best looking one with all the habs you can ever want.\"",
+        "recommended_at": "2024-05-24"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "X1sQtl7_K8I",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/1czurhn/ship_building_channels/",
+        "quote_or_summary": "Same thread. \"I build this ship with every character\" and a link to the Wolf Class end-game ship guide.",
+        "recommended_at": "2024-05-25"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "hyQztBnuiSM",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/starfieldmods/comments/1movf68/how_easy_it_is_to_create_a_mod_want_to_create_a/",
+        "quote_or_summary": "Asked for a YouTube guide to start modding, a commenter linked JRamosWorks and wrote: \"These are the videos that got me started.\"",
+        "recommended_at": "2025-08-13"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "T74-xqu0Nz0",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/1hbizhu/anyone_got_any_tips_for_shipbuilding/",
+        "quote_or_summary": "\"This guy, ShipTechnician on Youtube is the best I've seen at explaining things and building. ... This video is a great one to watch to get a good overview of things.\"",
+        "recommended_at": "2024-12-11"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "oyghJFq8A-k",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/1hbizhu/anyone_got_any_tips_for_shipbuilding/",
+        "quote_or_summary": "A follow-up on the same ship-building thread: \"What Mr Raspberry said. Also, this one is good,\" linking MajorSlackAttack's controls tutorial.",
+        "recommended_at": "2024-12-11"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "trV2HATQVVw",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/starfieldmods/comments/1mmuss0/mod_creation_assistance/",
+        "quote_or_summary": "Recommended for Creation Kit setup: \"Darkfox has some great videos on that, since some of it isn’t terribly intuitive.\"",
+        "recommended_at": "2025-08-12"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "SBcqKu0oS5c",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/14a7rfm/has_anyone_found_a_super_in_depth_look_at_the/",
+        "quote_or_summary": "\"DamarcoDude has a video that’s over 4 hours analyzing ever little detail of the Direct. Really enjoy his other videos as well.\"",
+        "recommended_at": "2023-06-15"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "1PX--o0gfiI",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/Starfield/comments/11qmdxc/which_video_to_see_everythng_we_know_about/",
+        "quote_or_summary": "Asked which video covers everything known so far, a commenter said to watch the official Bethesda videos and then \"this Starfield Signal supercut of everything we know so far.\"",
+        "recommended_at": "2023-03-14"
+      }
+    ]
+  },
+  {
+    "topic_slug": "starfield",
+    "youtube_id": "gDKivlGmia4",
+    "sources": [
+      {
+        "platform": "reddit",
+        "source_url": "https://www.reddit.com/r/starfieldmods/comments/1mmuss0/mod_creation_assistance/",
+        "quote_or_summary": "Recommended alongside Starfield-specific setup videos: \"BGS have some beginner videos from the Skyrim days which are still applicable, and paced well for picking up the basics.\"",
+        "recommended_at": "2025-08-12"
+      }
+    ]
+  }
+]

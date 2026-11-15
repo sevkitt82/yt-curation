@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f3ec;
+  --ink: #1e1a16;
+  --muted: #5e574e;
+  --line: #ddd4c4;
+  --pine: #0f4c3a;
+  --pine-soft: #e7f2ec;
+  --card: #fffdf8;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: Georgia, "Iowan Old Style", Palatino, serif;
+  font-weight: 500;
+}
+
+a {
+  color: var(--pine);
+}
+
+.shell {
+  width: min(68rem, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.55rem 0.7rem;
+  color: var(--ink);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pine);
+  color: white;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+}
+
+.btn:hover {
+  background: #0c3d2f;
+}
+
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+}
+
+.notice {
+  border: 1px solid var(--line);
+  background: var(--pine-soft);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
