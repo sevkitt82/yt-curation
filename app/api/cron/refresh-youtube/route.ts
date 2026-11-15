@@ -1,11 +1,10 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { refreshStaleYoutubeVideos } from "@/lib/refresh";
 
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

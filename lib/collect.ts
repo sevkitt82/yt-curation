@@ -176,7 +176,21 @@ export async function collectTopic(
       source_score: link.sourceScore,
       comment_count: link.commentCount,
     });
+    if (error?.message.includes("source_key") || error?.message.includes("source_score") || error?.message.includes("comment_count")) {
+      const retry = await admin.from("recommendation_sources").insert({
+        topic_id: topic.id,
+        video_id: video.id,
+        platform: link.platform,
+        source_url: link.sourceUrl,
+        quote_or_summary: link.excerpt,
+        recommended_at: link.recommendedAt,
+      });
+      if (!retry.error) sources += 1;
+      else console.error("source insert failed", retry.error.message);
+      continue;
+    }
     if (!error) sources += 1;
+    else console.error("source insert failed", error.message);
   }
 
   return { added, sources };

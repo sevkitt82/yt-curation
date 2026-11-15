@@ -1,12 +1,11 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { runDaily } from "@/lib/daily";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
   const admin = createAdminClient();
