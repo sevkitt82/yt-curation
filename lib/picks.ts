@@ -1,5 +1,6 @@
 import "server-only";
 
+import { connection } from "next/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { laToday, youtubeDataIsFresh } from "@/lib/time";
 import type { LengthBucket, Level, PublicPick, SourceRow, Topic, VideoRow } from "@/lib/types";
@@ -8,6 +9,7 @@ type Joined = {
   id: string;
   why_line: string | null;
   pick_date: string | null;
+  pick_slot: number | null;
   level: Level | null;
   length_bucket: LengthBucket | null;
   videos: VideoRow | VideoRow[] | null;
@@ -28,6 +30,7 @@ export function videoIsPublic(video: VideoRow): boolean {
 }
 
 export async function listLiveTopics(): Promise<Topic[]> {
+  await connection();
   const db = createPublicClient();
   if (!db) return [];
   const { data, error } = await db
@@ -43,6 +46,7 @@ export async function listLiveTopics(): Promise<Topic[]> {
 }
 
 export async function getTopicBySlug(slug: string): Promise<Topic | null> {
+  await connection();
   const db = createPublicClient();
   if (!db) return null;
   const { data } = await db
@@ -54,13 +58,14 @@ export async function getTopicBySlug(slug: string): Promise<Topic | null> {
 }
 
 export async function listPublicPicks(topicId: string): Promise<PublicPick[]> {
+  await connection();
   const db = createPublicClient();
   if (!db) return [];
   const today = laToday();
   const { data, error } = await db
     .from("topic_videos")
     .select(
-      `id, why_line, pick_date, level, length_bucket, video_id,
+      `id, why_line, pick_date, pick_slot, level, length_bucket, video_id,
        videos!inner (id, youtube_video_id, title, channel_id, channel_title, duration_seconds,
          published_at, thumbnail_url, description, embeddable, privacy_status,
          youtube_data_fetched_at, is_unavailable)`,
@@ -69,7 +74,8 @@ export async function listPublicPicks(topicId: string): Promise<PublicPick[]> {
     .eq("status", "approved")
     .not("pick_date", "is", null)
     .lte("pick_date", today)
-    .order("pick_date", { ascending: false });
+    .order("pick_date", { ascending: false })
+    .order("pick_slot", { ascending: true });
   if (error) {
     console.error("picks read failed", error.message);
     return [];
@@ -102,6 +108,7 @@ export async function listPublicPicks(topicId: string): Promise<PublicPick[]> {
       topicVideoId: row.id,
       whyLine: row.why_line,
       pickDate: row.pick_date,
+      pickSlot: row.pick_slot,
       level: row.level,
       lengthBucket: row.length_bucket,
       video,

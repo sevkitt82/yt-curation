@@ -43,9 +43,8 @@ async function CuratorTopic({
   const { data: picks } = await supabase
     .from("topic_videos")
     .select(
-      `id, status, why_line, pick_date, picked_by, pick_rationale, video_id,
-       videos (title, youtube_video_id, channel_id),
-       recommendation_sources (platform, source_url, source_key, quote_or_summary)`,
+      `id, status, why_line, pick_date, pick_slot, picked_by, pick_rationale, video_id,
+       videos (title, youtube_video_id, channel_id)`,
     )
     .eq("topic_id", topic.id)
     .not("pick_date", "is", null)
@@ -70,10 +69,20 @@ async function CuratorTopic({
 
   const { data: past } = await supabase
     .from("topic_videos")
-    .select("video_id, recommendation_sources (platform, source_url, source_key)")
+    .select("video_id")
     .eq("topic_id", topic.id)
     .eq("status", "approved")
     .not("pick_date", "is", null);
+  const { data: sourceRows } = await supabase
+    .from("recommendation_sources")
+    .select("video_id, platform, source_url, source_key")
+    .eq("topic_id", topic.id);
+  const sourcesByVideo = new Map<string, { platform: string; source_url: string | null; source_key?: string | null }[]>();
+  for (const source of sourceRows ?? []) {
+    const list = sourcesByVideo.get(source.video_id as string) ?? [];
+    list.push(source);
+    sourcesByVideo.set(source.video_id as string, list);
+  }
   const pastIds = (past ?? []).map((row) => row.video_id as string);
   const { data: votes } = pastIds.length
     ? await supabase
@@ -92,7 +101,7 @@ async function CuratorTopic({
   }
   const rates = ratesFromPicks(
     (past ?? []).map((row) => {
-      const keys = ((row.recommendation_sources ?? []) as { platform: string; source_url: string | null; source_key?: string | null }[]).flatMap(
+      const keys = (sourcesByVideo.get(row.video_id as string) ?? []).flatMap(
         (source) => {
           const key = sourceKeyFor(source.platform, source.source_url, source.source_key);
           return key ? [key] : [];
@@ -129,25 +138,26 @@ async function CuratorTopic({
 
       <form action={runTopicDaily}>
         <input type="hidden" name="slug" value={topic.slug} />
-        <button className="btn">Collect and pick</button>
+        <button className="btn">Collect and pick for today</button>
       </form>
 
       <section>
         <h2 className="text-2xl">Upcoming</h2>
         <ul className="mt-3 flex flex-col gap-2 text-sm">
           {days.map((day) => {
-            const pick = upcoming.find((row) => row.pick_date === day);
-            const video = pick ? (Array.isArray(pick.videos) ? pick.videos[0] : pick.videos) : null;
+            const dayPicks = upcoming.filter((row) => row.pick_date === day);
             return (
               <li key={day} className="card p-3">
                 <p className="font-medium">
                   {day}
-                  {day === earliest ? " · next slot" : ""}
-                  {pick ? "" : " · empty"}
+                  {day === today ? " · today" : ""}
+                  {dayPicks.length === 0 ? " · empty" : ` · ${dayPicks.length} of 3`}
                 </p>
-                {pick ? (
-                  <div className="mt-2 flex flex-col gap-2">
-                    <p>{video?.title ?? "Pick"} · {String(pick.picked_by ?? "ai")}</p>
+                {dayPicks.map((pick) => {
+                  const video = Array.isArray(pick.videos) ? pick.videos[0] : pick.videos;
+                  return (
+                  <div key={pick.id as string} className="mt-2 flex flex-col gap-2">
+                    <p>Slot {String(pick.pick_slot ?? "")} · {video?.title ?? "Pick"} · {String(pick.picked_by ?? "ai")}</p>
                     <form action={saveWhyLine} className="flex flex-col gap-2">
                       <input type="hidden" name="slug" value={topic.slug} />
                       <input type="hidden" name="topic_video_id" value={pick.id as string} />
@@ -163,7 +173,8 @@ async function CuratorTopic({
                       <button className="btn-quiet">Veto</button>
                     </form>
                   </div>
-                ) : null}
+                  );
+                })}
               </li>
             );
           })}

@@ -21,7 +21,7 @@ async function HomeContent() {
         <p className="text-sm uppercase tracking-wide text-[var(--muted)]">Working title</p>
         <h1 className="mt-2 text-4xl leading-tight">Only the YouTube videos worth your time.</h1>
         <p className="mt-4 text-lg text-[var(--muted)]">
-          One video a day on AI game development and Starfield, taken from what people recommend elsewhere. A short
+          Three videos a day on AI game development and Starfield, taken from what people recommend elsewhere. A short
           note says why it&apos;s here. No view counts. No like counts.
         </p>
         <ul className="mt-4 list-disc pl-5 text-sm">

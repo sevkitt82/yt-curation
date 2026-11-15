@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { runDaily } from "@/lib/daily";
 import { pickTopic } from "@/lib/pick-topic";
+import { laToday } from "@/lib/time";
 import { curatorCanEdit, getCurator } from "@/lib/curator";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -177,9 +178,15 @@ export async function vetoPick(formData: FormData) {
   const slug = String(formData.get("slug") ?? "");
   const id = String(formData.get("topic_video_id") ?? "");
   const { supabase, topic } = await topicContext(slug);
+  const { data: current } = await supabase
+    .from("topic_videos")
+    .select("pick_date, pick_slot")
+    .eq("id", id)
+    .eq("topic_id", topic.id)
+    .maybeSingle();
   const { error } = await supabase
     .from("topic_videos")
-    .update({ status: "rejected", pick_date: null })
+    .update({ status: "rejected", pick_date: null, pick_slot: null })
     .eq("id", id)
     .eq("topic_id", topic.id)
     .eq("status", "approved");
@@ -187,10 +194,19 @@ export async function vetoPick(formData: FormData) {
 
   const admin = createAdminClient();
   if (!admin) notice(slug, "Vetoed. Re-pick needs SUPABASE_SECRET_KEY.");
-  const result = await pickTopic(admin, topic);
+  const result = await pickTopic(admin, topic, {
+    date: (current?.pick_date as string | null) ?? laToday(),
+    onlySlot: (current?.pick_slot as number | null) ?? undefined,
+  });
   revalidatePath(`/curator/topics/${slug}`);
   revalidatePath(`/topics/${slug}`);
-  notice(slug, result.pickDate ? `Vetoed. A replacement is scheduled for ${result.pickDate}.` : `Vetoed. ${result.gap ?? result.skipped ?? "No replacement."}`);
+  const replacement = result.picks?.[0];
+  notice(
+    slug,
+    replacement
+      ? `Vetoed. Slot ${replacement.slot} on ${result.pickDate} was filled again.`
+      : `Vetoed. ${result.gap ?? result.skipped ?? "No replacement."}`,
+  );
 }
 
 export async function runTopicDaily(formData: FormData) {
@@ -199,12 +215,14 @@ export async function runTopicDaily(formData: FormData) {
   const admin = createAdminClient();
   if (!admin) notice(slug, "SUPABASE_SECRET_KEY is not set.");
   try {
-    const [result] = await runDaily(admin, slug);
+    const [result] = await runDaily(admin, slug, laToday());
     revalidatePath(`/curator/topics/${slug}`);
     revalidatePath(`/topics/${slug}`);
     if (!result) notice(slug, "Topic not found.");
     if (result.gap) notice(slug, result.gap);
-    if (result.pickDate) notice(slug, `Pick scheduled for ${result.pickDate}. Collected ${result.added} new videos.`);
+    if (result.picks?.length) {
+      notice(slug, `Published ${result.picks.length} pick${result.picks.length === 1 ? "" : "s"} for ${result.pickDate}. Collected ${result.added} new videos.`);
+    }
     notice(slug, result.skipped ?? "Nothing new to schedule.");
   } catch (error) {
     notice(slug, error instanceof Error ? error.message : "Daily run failed.");

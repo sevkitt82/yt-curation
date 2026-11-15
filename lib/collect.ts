@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { COLLECTOR_USER_AGENT } from "@/lib/config";
-import { linksInPosts, parseHnHits, parseRedditRss, type FoundLink } from "@/lib/feeds";
+import { linksInPosts, parseHnHits, parseRedditRss, postSummary, type FoundLink } from "@/lib/feeds";
 import { sourceConfigFor } from "@/lib/source-config";
 import type { SourceConfig } from "@/lib/types";
 import { fetchVideosList, metadataRow } from "@/lib/youtube";
@@ -14,7 +14,7 @@ let redditJsonBlocked = false;
 async function redditPosts(subreddit: string) {
   const headers = { "User-Agent": COLLECTOR_USER_AGENT, Accept: "application/json, application/atom+xml" };
   if (!redditJsonBlocked) {
-    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=25`, { headers });
+    const jsonResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.json?limit=100`, { headers });
     if (jsonResponse.status === 403) redditJsonBlocked = true;
     if (jsonResponse.ok) {
       const body = (await jsonResponse.json()) as {
@@ -29,7 +29,7 @@ async function redditPosts(subreddit: string) {
           {
             sourceUrl: permalink,
             text,
-            excerpt: String(data.title ?? text).slice(0, 400),
+            excerpt: postSummary(String(data.title ?? ""), String(data.selftext ?? "")),
             sourceScore: typeof data.score === "number" ? data.score : null,
             commentCount: typeof data.num_comments === "number" ? data.num_comments : null,
             recommendedAt:
@@ -41,10 +41,10 @@ async function redditPosts(subreddit: string) {
       });
     }
   }
-  let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
+  let rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
   if (rssResponse.status === 429) {
     await pause(8000);
-    rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=25`, { headers });
+    rssResponse = await fetch(`https://www.reddit.com/r/${subreddit}/new.rss?limit=100`, { headers });
   }
   if (!rssResponse.ok) throw new Error(`Reddit r/${subreddit} returned ${rssResponse.status}.`);
   return parseRedditRss(await rssResponse.text());

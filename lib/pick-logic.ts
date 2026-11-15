@@ -17,7 +17,7 @@ export type RateStat = { good: number; total: number; rate: number };
 
 export type ModelChoice = { videoId: string; whyLine: string; rationale: string };
 
-export type PickModel = (prompt: string) => Promise<ModelChoice>;
+export type PickModel = (prompt: string) => Promise<ModelChoice[]>;
 
 export function smoothedRate(good: number, total: number): number {
   return (good + 1) / (total + 2);
@@ -69,6 +69,7 @@ export function buildPickPrompt(
   candidates: CandidateInput[],
   rates: Map<string, RateStat>,
   channelRates: Map<string, RateStat> | null,
+  count: number,
 ): string {
   const lines = candidates.map((candidate) => {
     const sources = candidate.sources
@@ -96,7 +97,7 @@ export function buildPickPrompt(
   });
 
   return [
-    "Choose one video id from the list. You are given only recommendation posts from outside YouTube, plus an opaque id.",
+    `Choose ${count} different video ids from the list. You are given only recommendation posts from outside YouTube, plus an opaque id.`,
     "Do not use or invent YouTube titles, descriptions, thumbnails, comments, view counts, or like counts. They are not inputs.",
     "Prefer sources with a higher good-rate. Still explore: when a source has little vote data, it can be the right pick.",
     "Write a why-line of one or two sentences that cites the recommendation. Write a short rationale for the curator.",
@@ -118,30 +119,31 @@ export async function chooseFromPool(args: {
   recentSourceKeys: string[];
   channelRates: Map<string, RateStat> | null;
   model: PickModel | null;
-}): Promise<{ ok: true; choice: ModelChoice; prompt: string } | { ok: false; gap: string }> {
+  count: number;
+}): Promise<{ ok: true; choices: ModelChoice[]; prompt: string } | { ok: false; gap: string }> {
+  const count = Math.min(3, Math.max(1, args.count));
   if (args.candidates.length === 0) return { ok: false, gap: "No candidates left to pick." };
   if (!args.model) return { ok: false, gap: explainMissingKey() };
 
   const pool = poolForExploration(args.candidates, args.recentSourceKeys, args.rates);
-  const prompt = buildPickPrompt(pool, args.rates, args.channelRates);
+  const prompt = buildPickPrompt(pool, args.rates, args.channelRates, count);
   try {
-    const choice = await args.model(prompt);
-    if (!pool.some((candidate) => candidate.id === choice.videoId)) {
-      const gap = "The model chose a video that is not in the pool.";
+    const returned = await args.model(prompt);
+    const used = new Set<string>();
+    const choices: ModelChoice[] = [];
+    for (const choice of returned) {
+      if (choices.length >= count) break;
+      const whyLine = choice.whyLine.trim();
+      if (!whyLine || used.has(choice.videoId) || !pool.some((candidate) => candidate.id === choice.videoId)) continue;
+      used.add(choice.videoId);
+      choices.push({ videoId: choice.videoId, whyLine, rationale: choice.rationale.trim() });
+    }
+    if (choices.length === 0) {
+      const gap = "The model did not return a pick from the pool.";
       console.error("Daily pick failed:", gap);
       return { ok: false, gap };
     }
-    const whyLine = choice.whyLine.trim();
-    if (!whyLine) {
-      const gap = "The model did not write a why-line.";
-      console.error("Daily pick failed:", gap);
-      return { ok: false, gap };
-    }
-    return {
-      ok: true,
-      choice: { videoId: choice.videoId, whyLine, rationale: choice.rationale.trim() },
-      prompt,
-    };
+    return { ok: true, choices, prompt };
   } catch (error) {
     const gap = error instanceof Error ? error.message : "The model call failed.";
     console.error("Daily pick failed:", gap);
