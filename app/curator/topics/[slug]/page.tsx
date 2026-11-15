@@ -43,9 +43,9 @@ async function CuratorTopic({
   const { data: picks } = await supabase
     .from("topic_videos")
     .select(
-      `id, status, why_line, pick_date, video_id,
+      `id, status, why_line, pick_date, picked_by, pick_rationale, video_id,
        videos (title, youtube_video_id, channel_id),
-       recommendation_sources (platform, source_url, quote_or_summary)`,
+       recommendation_sources (platform, source_url, source_key, quote_or_summary)`,
     )
     .eq("topic_id", topic.id)
     .not("pick_date", "is", null)
@@ -70,7 +70,7 @@ async function CuratorTopic({
 
   const { data: past } = await supabase
     .from("topic_videos")
-    .select("video_id, recommendation_sources (platform, source_url)")
+    .select("video_id, recommendation_sources (platform, source_url, source_key)")
     .eq("topic_id", topic.id)
     .eq("status", "approved")
     .not("pick_date", "is", null);
@@ -147,13 +147,16 @@ async function CuratorTopic({
                 </p>
                 {pick ? (
                   <div className="mt-2 flex flex-col gap-2">
-                    <p>{video?.title ?? "Pick"}</p>
+                    <p>{video?.title ?? "Pick"} · {String(pick.picked_by ?? "ai")}</p>
                     <form action={saveWhyLine} className="flex flex-col gap-2">
                       <input type="hidden" name="slug" value={topic.slug} />
                       <input type="hidden" name="topic_video_id" value={pick.id as string} />
                       <textarea name="why_line" rows={2} defaultValue={(pick.why_line as string | null) ?? ""} />
                       <button className="btn-quiet w-fit">Save why-line</button>
                     </form>
+                    {pick.pick_rationale ? (
+                      <p className="text-[var(--muted)]">Internal note: {pick.pick_rationale as string}</p>
+                    ) : null}
                     <form action={vetoPick}>
                       <input type="hidden" name="slug" value={topic.slug} />
                       <input type="hidden" name="topic_video_id" value={pick.id as string} />

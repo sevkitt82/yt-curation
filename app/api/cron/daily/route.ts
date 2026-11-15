@@ -13,7 +13,8 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "SUPABASE_SECRET_KEY is not set." }, { status: 500 });
   }
   try {
-    const topics = await runDaily(admin);
+    const slug = new URL(request.url).searchParams.get("slug")?.trim();
+    const topics = await runDaily(admin, slug && /^[a-z0-9-]+$/.test(slug) ? slug : undefined);
     return Response.json({ ok: true, topics });
   } catch (error) {
     console.error("daily job failed", error instanceof Error ? error.message : "unknown");
